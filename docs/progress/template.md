@@ -1,38 +1,26 @@
 # Day X
 
-> Copy this file to `day-XX.md` at the start of each implementation day.
+> Copy to `day-XX.md` at the start of each implementation day.
 
 ## Goals
 
-- What was planned for today
+-
 
 ## Features Implemented
 
-- What was completed
+-
 
-## Folder/File Changes
-
-### New files
+## Files Added
 
 -
 
-### Updated files
-
--
-
-## API Changes
-
-### New routes
-
--
-
-### Modified routes
+## Files Modified
 
 -
 
 ## Database Changes
 
-### Collections added
+### Tables added
 
 -
 
@@ -40,13 +28,19 @@
 
 -
 
+### Migrations
+
+-
+
+## Routes Added
+
+-
+
 ## Architecture Decisions
 
-- Decision:
-  - **Why:**
-  - **Alternatives considered:**
+-
 
-## Issues Faced
+## Problems Faced
 
 -
 
@@ -54,7 +48,7 @@
 
 -
 
-## Pending Tasks
+## Pending Work
 
 -
 

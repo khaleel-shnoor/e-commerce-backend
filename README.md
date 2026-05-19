@@ -1,112 +1,110 @@
 # SHNOOR E-Commerce Backend
 
-Scalable SaaS backend for the **SHNOOR** multi-vendor marketplace. Built with **Python 3.14**, **FastAPI**, and async-first patterns to support admin, seller, and customer flows aligned with the React frontend.
+Production-grade, **async-first**, **AI-ready** SaaS API for the SHNOOR multi-vendor marketplace. Built with **Python 3.14**, **FastAPI**, and **PostgreSQL** (SQLAlchemy 2.0 async + Alembic).
 
 ---
 
 ## Project Overview
 
-This service powers:
+Powers admin, seller, and customer experiences for the React frontend:
 
-- **Admin** — products, orders, sellers, coupons, CMS, analytics, support
-- **Sellers** — inventory, store customization, shipping, wallet, transactions
-- **Customers** — catalog, cart, checkout, reviews, notifications
-
-The backend is designed as an enterprise-ready foundation: versioned APIs, typed configuration, modular packages, and daily engineering documentation.
+- Catalog, cart, orders, reviews, coupons
+- Seller stores, inventory, transactions
+- Admin moderation, analytics, notifications
+- **Future:** semantic search, recommendations, AI agents (pgvector)
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Frontend (Vite)                    │
-└─────────────────────────────┬───────────────────────────────┘
-                              │ HTTP / WebSocket (future)
-┌─────────────────────────────▼───────────────────────────────┐
-│                    FastAPI Application                       │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │ Middleware  │  │  API /v1     │  │  Services (future)  │ │
-│  └─────────────┘  └──────────────┘  └─────────────────────┘ │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────┐
-│              MongoDB (planned) · Redis · AI APIs             │
-└─────────────────────────────────────────────────────────────┘
+React Frontend
+      │
+      ▼
+FastAPI (app/main.py)
+      ├── API v1 routes
+      ├── Services (business logic)
+      ├── Repositories (data access)
+      └── SQLAlchemy async ──► PostgreSQL
+                ▲
+           Alembic migrations
 ```
 
-### Layer responsibilities
+**AI modules** live under `app/ai/` (recommendations, embeddings, search, ranking, agents, personalization).
 
-| Layer | Path | Purpose |
-|-------|------|---------|
-| **Entry** | `src/shnoor/main.py` | App factory, CORS, lifespan |
-| **API** | `src/shnoor/api/v1/` | HTTP routes, request/response models |
-| **Core** | `src/shnoor/core/` | Config, logging, security helpers |
-| **Services** | `src/shnoor/services/` *(planned)* | Business logic |
-| **Repositories** | `src/shnoor/repositories/` *(planned)* | Data access |
-| **Models** | `src/shnoor/models/` *(planned)* | Domain & DB schemas |
-
----
-
-## Setup Instructions
-
-### Prerequisites
-
-- [Python 3.14](https://www.python.org/downloads/)
-- Git
-- (Optional) MongoDB — required when the database layer is added
-
-### Clone and enter the project
-
-```bash
-cd backend
-```
+Full system context: [`docs/project-context.md`](docs/project-context.md)
 
 ---
 
 ## Python 3.14 Setup
 
-### Windows
-
 ```powershell
-# Install Python 3.14 from python.org or winget
+# Windows
 winget install Python.Python.3.14
-
-python --version   # should show 3.14.x
+python --version   # 3.14.x
 ```
 
-### macOS / Linux
-
 ```bash
-pyenv install 3.14.0
-pyenv local 3.14.0
-python --version
+# macOS / Linux
+pyenv install 3.14.0 && pyenv local 3.14.0
 ```
 
 ---
 
-## Virtual Environment Setup
+## Virtual Environment
 
-```bash
-# Create venv (Python 3.14)
+```powershell
+cd backend
 python -m venv .venv
-
-# Activate
-# Windows (PowerShell)
 .\.venv\Scripts\Activate.ps1
-
-# macOS / Linux
-source .venv/bin/activate
-
-# Install project + dev dependencies
 pip install -e ".[dev]"
+# or: pip install -r requirements.txt
 ```
 
-### Environment variables
+---
 
-```bash
-cp .env.example .env
-# Edit .env with your local values
+## PostgreSQL Setup
+
+### 1. Install PostgreSQL 16+
+
+Ensure the server is running locally or use Docker:
+
+```powershell
+docker run -d --name shnoor-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=shnoor `
+  -p 5432:5432 postgres:16
+```
+
+### 2. Create database
+
+```sql
+CREATE DATABASE shnoor;
+```
+
+### 3. Configure environment
+
+```powershell
+copy .env.example .env
+# Edit DATABASE_URL if needed:
+# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/shnoor
+```
+
+---
+
+## Alembic Migration Setup
+
+```powershell
+# Generate initial migration from models
+alembic revision --autogenerate -m "initial_schema"
+
+# Review alembic/versions/*.py, then apply:
+alembic upgrade head
+
+# Or use helper script:
+.\scripts\migrate.ps1 "initial_schema"
+.\scripts\migrate.ps1 upgrade
 ```
 
 ---
@@ -115,23 +113,21 @@ cp .env.example .env
 
 | Command | Description |
 |---------|-------------|
-| `shnoor-api` | Start API server (uses `.env`) |
-| `python -m shnoor.main` | Same as above |
-| `uvicorn shnoor.main:app --reload` | Dev server with auto-reload |
-| `pytest` | Run test suite |
-| `ruff check src tests` | Lint |
-| `ruff format src tests` | Format |
-| `mypy src` | Type check |
+| `uvicorn app.main:app --reload` | **Primary** dev server |
+| `shnoor-api` | Same via CLI entry point |
+| `alembic upgrade head` | Apply migrations |
+| `pytest` | Unit tests |
+| `RUN_DB_TESTS=1 pytest` | Include PostgreSQL integration tests |
+| `black app tests` | Format |
+| `isort app tests` | Sort imports |
+| `pylint app` | Lint |
 
-### Development server
-
-```bash
-uvicorn shnoor.main:app --host 0.0.0.0 --port 8000 --reload
-```
+### URLs (development)
 
 - API: http://localhost:8000  
-- OpenAPI docs: http://localhost:8000/docs  
+- Docs: http://localhost:8000/docs  
 - Health: http://localhost:8000/api/v1/health  
+- Status: http://localhost:8000/api/v1/status  
 
 ---
 
@@ -139,89 +135,80 @@ uvicorn shnoor.main:app --host 0.0.0.0 --port 8000 --reload
 
 ```
 backend/
+├── app/
+│   ├── main.py
+│   ├── api/v1/          # Routes
+│   ├── core/            # Config, DB, security, deps
+│   ├── models/          # SQLAlchemy ORM (20 tables)
+│   ├── schemas/         # Pydantic DTOs
+│   ├── repositories/    # Data access
+│   ├── services/        # Business logic
+│   ├── ai/              # AI subsystems (placeholders)
+│   ├── admin|seller|customer/
+│   ├── jobs|websockets|events|middleware/
+├── alembic/             # Migrations
+├── tests/
 ├── docs/
-│   └── progress/           # Daily engineering journal
-│       ├── template.md
-│       └── day-01.md
-├── src/
-│   └── shnoor/
-│       ├── main.py         # App entry point
-│       ├── api/v1/         # Versioned HTTP routes
-│       └── core/           # Config, logging
-├── tests/                  # Pytest suite
-├── pyproject.toml          # Python 3.14 project config
-├── .env.example
-└── README.md
+│   ├── project-context.md   # Master AI handoff doc
+│   └── progress/            # Daily engineering logs
+├── scripts/
+├── uploads/  logs/
+├── pyproject.toml
+└── requirements.txt
 ```
-
-Planned packages (add as features land):
-
-- `shnoor/models/` — Pydantic & DB document models  
-- `shnoor/repositories/` — MongoDB access  
-- `shnoor/services/` — Business logic  
-- `shnoor/middleware/` — Auth, rate limits, request IDs  
-- `shnoor/ai/` — Recommendations, search, support bots  
-- `shnoor/websocket/` — Real-time events  
-
----
-
-## Future AI Roadmap
-
-| Phase | Capability | Integration |
-|-------|------------|-------------|
-| **1** | Semantic product search | Embeddings + vector store |
-| **2** | Personalized recommendations | User behavior + catalog signals |
-| **3** | Seller insights | Sales trends, inventory alerts |
-| **4** | Support assistant | Ticket triage, FAQ, order lookup |
-| **5** | Content moderation | Review & listing quality scoring |
-
-All AI modules will live under `src/shnoor/ai/` with clear service boundaries and documented API contracts.
 
 ---
 
 ## Documentation Workflow
 
-### Daily progress journal
+### 1. Daily engineering logs
 
-Every implementation day must update `docs/progress/day-XX.md` using `docs/progress/template.md`.
+`docs/progress/day-XX.md` — copy from `template.md` each day.
 
-**Document when you add or change:**
+Document: goals, features, files, DB changes, routes, decisions, issues, tomorrow plan.
 
-- Modules, routes, middleware  
-- Database collections or schemas  
-- Services, AI modules, auth, WebSockets  
-- Architecture or optimization decisions  
+### 2. Master project context
 
-### Automatic documentation rule
+**Always update** [`docs/project-context.md`](docs/project-context.md) when you add:
 
-If you implement it, update the corresponding daily file **the same day** with:
+- Routes, models, auth, AI modules, WebSockets, middleware, architecture changes
 
-- Goals, features, file changes  
-- API and database deltas  
-- Decisions, issues, solutions  
-- Pending tasks and tomorrow’s plan  
+This file is the **single source of truth** for AI tools and new developers.
+
+---
+
+## AI Roadmap
+
+| Phase | Capability |
+|-------|------------|
+| 4 | pgvector embeddings, semantic search |
+| 4 | Recommendation engine |
+| 5 | AI agents / chatbots |
+| 5 | Personalization, ranking ML |
+
+Code placeholders: `app/ai/*`
+
+---
+
+## Project Scaling Vision
+
+- **Phase 1:** Foundation (current) — PostgreSQL, models, health API  
+- **Phase 2:** Auth, CRUD, admin/seller/customer APIs  
+- **Phase 3:** Redis cache, Celery jobs, WebSockets, events  
+- **Phase 4:** pgvector, semantic search, recommendations  
+- **Phase 5:** AI agents, analytics ML, multi-region  
+
+Designed for horizontal API scaling, read replicas, and event-driven order processing.
 
 ---
 
 ## Coding Conventions
 
-| Topic | Convention |
-|-------|------------|
-| **Python** | 3.14+, strict typing, `async` for I/O |
-| **Style** | Ruff (format + lint), line length 100 |
-| **Types** | Mypy strict mode; prefer `TypedDict`, `type` aliases |
-| **API** | Versioned under `/api/v1`; thin routes, fat services |
-| **Config** | `pydantic-settings`; never commit `.env` |
-| **Errors** | Consistent HTTP exceptions; structured logging |
-| **Tests** | `pytest` + `pytest-asyncio`; mirror `src/` in `tests/` |
-| **Files** | Keep modules under ~300 lines; split by domain |
-| **Secrets** | Environment variables only; use `.env.example` as template |
-
-### Naming
-
-- **Packages:** lowercase (`shnoor.services.orders`)
-- **Routes:** kebab-case paths (`/api/v1/order-items`)
-- **Models:** PascalCase (`ProductCreate`, `OrderDocument`)
+- Async routes and repositories  
+- Thin routes → services → repositories  
+- UUID PKs, typed enums, timezone timestamps  
+- black + isort + pylint  
+- Update `docs/project-context.md` + daily log with every significant change  
 
 ---
 

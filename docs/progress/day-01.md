@@ -1,5 +1,9 @@
 # Day 01
 
+> **Note:** Day 01 used a MongoDB placeholder. The stack was fully migrated to **PostgreSQL** on Day 02. See `day-02.md` and `docs/project-context.md`.
+
+# Day 01 (historical)
+
 ## Goals
 
 - Bootstrap the SHNOOR e-commerce backend from an empty repository

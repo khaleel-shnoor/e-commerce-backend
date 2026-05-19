@@ -32,6 +32,7 @@ ENV/
 .coverage
 htmlcov/
 .hypothesis/
+.pylint.d/
 
 # Environment & secrets
 .env
@@ -51,7 +52,8 @@ htmlcov/
 Thumbs.db
 
 # Logs & runtime
-logs/
-*.log
+logs/*.log
+!logs/.gitkeep
 tmp/
-uploads/
+uploads/*
+!uploads/.gitkeep

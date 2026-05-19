@@ -1,0 +1,18 @@
+# Production dependencies — pinned for stable Render / GitHub auto-deploy
+# Install: pip install -r requirements.txt
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+pydantic==2.10.6
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+httpx==0.28.1
+sqlalchemy[asyncio]==2.0.40
+asyncpg==0.30.0
+alembic==1.14.1
+bcrypt==4.2.1
+python-jose[cryptography]==3.4.0
+authlib==1.4.1
+email-validator==2.2.0
+itsdangerous==2.2.0
+cloudinary==1.44.2
+python-multipart==0.0.20

@@ -1,0 +1,57 @@
+# Render Blueprint — SHNOOR E-Commerce FastAPI backend
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy: connect this repo in Render Dashboard → New → Blueprint
+# Or configure manually using the values below.
+
+services:
+  - type: web
+    name: e-commerce-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: >-
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: APP_NAME
+        value: SHNOOR API
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      # Set in Render Dashboard (never commit secrets):
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: JWT_REFRESH_SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false

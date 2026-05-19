@@ -33,14 +33,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     db_manager = DatabaseSessionManager(settings)
     app.state.db_manager = db_manager
+    app.state.db_connected = False
 
-    await verify_database_on_startup(db_manager, settings)
+    db_ok = await verify_database_on_startup(db_manager, settings)
     configure_oauth(settings)
 
-    async with db_manager._session_factory() as session:  # noqa: SLF001
-        await seed_roles(session)
-        await session.commit()
-    logger.info("Application startup complete (version %s)", __version__)
+    if db_ok:
+        try:
+            async with db_manager._session_factory() as session:  # noqa: SLF001
+                await seed_roles(session)
+                await session.commit()
+            app.state.db_connected = True
+        except Exception:
+            logger.exception("Role seeding failed — continuing without seed")
+    else:
+        logger.error(
+            "Skipping role seed — fix DATABASE_URL in Render and redeploy"
+        )
+
+    logger.info(
+        "Application startup complete (version %s, database=%s)",
+        __version__,
+        "connected" if app.state.db_connected else "unavailable",
+    )
 
     yield
 

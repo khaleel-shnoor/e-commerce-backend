@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     password_reset_expire_minutes: int = Field(default=60, alias="PASSWORD_RESET_EXPIRE_MINUTES")
     email_verification_expire_hours: int = Field(default=24, alias="EMAIL_VERIFICATION_EXPIRE_HOURS")
 
+    @field_validator(
+        "database_url",
+        "jwt_secret_key",
+        "jwt_refresh_secret_key",
+        "google_client_id",
+        "google_client_secret",
+        mode="before",
+    )
+    @classmethod
+    def empty_str_to_none(cls, value: str | None) -> str | None:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return value.strip() if isinstance(value, str) else value
+
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
     google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     google_redirect_uri: str = Field(

@@ -33,6 +33,12 @@ def validate_settings(settings: Settings) -> None:
 
     if not settings.database_url:
         errors.append("DATABASE_URL is required when APP_ENV=production")
+    elif not settings.database_url.startswith(
+        ("postgresql://", "postgres://", "postgresql+asyncpg://")
+    ):
+        errors.append(
+            "DATABASE_URL must start with postgresql:// (copy the full Neon connection string)"
+        )
 
     if settings.secret_key in _INSECURE_SECRETS or len(settings.secret_key) < 32:
         errors.append(
@@ -85,13 +91,21 @@ def log_startup_banner(settings: Settings) -> None:
 async def verify_database_on_startup(
     db_manager: DatabaseSessionManager,
     settings: Settings,
-) -> None:
-    """Probe PostgreSQL once at startup; surfaces Neon/SSL issues early in logs."""
+) -> bool:
+    """
+    Probe PostgreSQL once at startup; surfaces Neon/SSL issues early in logs.
+
+    Returns True when connected. Does not raise — Render should stay up so /health
+    and logs remain available while you fix DATABASE_URL.
+    """
     try:
         async with db_manager.engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("Database connection verified successfully")
+        return True
     except Exception:
-        logger.exception("Database connection failed during startup")
-        if settings.is_production:
-            raise
+        logger.exception(
+            "Database connection failed during startup — check DATABASE_URL on Render "
+            "(must be full Neon URL with ?sslmode=require)"
+        )
+        return False

@@ -81,14 +81,21 @@ class Settings(BaseSettings):
         Field(default=None, alias="ALLOWED_ORIGINS"),
     ]
 
+    @staticmethod
+    def _normalize_origin(origin: str) -> str:
+        """Strip whitespace and trailing slash — browser Origin never includes a trailing slash."""
+        return origin.strip().rstrip("/")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: str | list[str] | None) -> list[str]:
         if value is None or value == "":
             return ["http://localhost:5173"]
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+            origins = value.split(",")
+        else:
+            origins = value
+        return [cls._normalize_origin(o) for o in origins if o and o.strip()]
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
@@ -96,9 +103,11 @@ class Settings(BaseSettings):
         if value is None or value == "":
             return None
         if isinstance(value, str):
-            parsed = [origin.strip() for origin in value.split(",") if origin.strip()]
-            return parsed or None
-        return value
+            origins = value.split(",")
+        else:
+            origins = value
+        parsed = [cls._normalize_origin(o) for o in origins if o and o.strip()]
+        return parsed or None
 
     @model_validator(mode="after")
     def merge_allowed_origins(self) -> "Settings":

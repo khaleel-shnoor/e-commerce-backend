@@ -63,8 +63,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = resolved_settings
 
-    # Session first, CORS last — last added = outermost, so CORS wraps all responses
-    app.add_middleware(SessionMiddleware, secret_key=resolved_settings.secret_key)
+    # Session stores OAuth state — callback must hit the same backend that started login
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=resolved_settings.secret_key,
+        same_site="lax",
+        https_only=resolved_settings.is_production,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved_settings.cors_origins,

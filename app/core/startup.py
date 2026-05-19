@@ -40,8 +40,19 @@ def validate_settings(settings: Settings) -> None:
             "Generate with: openssl rand -hex 32"
         )
 
-    if settings.jwt_secret_key in _INSECURE_SECRETS or len(settings.jwt_secret_key) < 32:
-        errors.append("JWT_SECRET_KEY (or SECRET_KEY) must be a strong random value in production")
+    # Optional overrides — only validate when explicitly set (otherwise SECRET_KEY is used)
+    if settings.jwt_secret_key is not None:
+        if settings.jwt_secret_key in _INSECURE_SECRETS or len(settings.jwt_secret_key) < 32:
+            errors.append("JWT_SECRET_KEY must be a strong random value when set in production")
+
+    if settings.jwt_refresh_secret_key is not None:
+        if (
+            settings.jwt_refresh_secret_key in _INSECURE_SECRETS
+            or len(settings.jwt_refresh_secret_key) < 32
+        ):
+            errors.append(
+                "JWT_REFRESH_SECRET_KEY must be a strong random value when set in production"
+            )
 
     if settings.app_debug:
         errors.append("APP_DEBUG must be false in production")

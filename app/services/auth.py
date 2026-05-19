@@ -244,6 +244,7 @@ class AuthService:
         user.password_hash = hash_password(data.new_password)
         await self.reset_tokens.mark_used(row)
         await self.refresh_tokens.revoke_all_for_user(user.id)
+        await self.session.flush()
 
     async def issue_tokens_for_user(
         self,

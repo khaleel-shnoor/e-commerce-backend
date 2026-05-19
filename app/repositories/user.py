@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -28,6 +28,33 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User).where(User.id == user_id).options(selectinload(User.roles))
         result = await self.session.scalars(stmt)
         return result.first()
+
+    async def list_with_roles(
+        self,
+        *,
+        search: str | None = None,
+        role: RoleName | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[User]:
+        stmt = select(User).options(selectinload(User.roles)).order_by(User.created_at.desc())
+
+        if role is not None:
+            stmt = stmt.join(User.roles).where(Role.name == role)
+
+        if search:
+            term = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    User.email.ilike(term),
+                    User.full_name.ilike(term),
+                    User.phone.ilike(term),
+                )
+            )
+
+        stmt = stmt.distinct().limit(limit).offset(offset)
+        result = await self.session.scalars(stmt)
+        return list(result.all())
 
 
 class RoleRepository(BaseRepository[Role]):

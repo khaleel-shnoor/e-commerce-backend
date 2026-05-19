@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Query
 
 from app.core.dependencies import AdminUser, DbSession
-from app.models.enums import SellerStatus
+from app.models.enums import RoleName, SellerStatus
 from app.schemas.admin import AdminSellersListResponse, AdminUsersListResponse
 from app.services.admin import AdminService
 

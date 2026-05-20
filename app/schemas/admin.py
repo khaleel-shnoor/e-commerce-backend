@@ -28,6 +28,7 @@ class AdminSellerItem(SchemaBase):
     store_slug: str
     status: SellerStatus
     user_is_active: bool
+    user_is_verified: bool
     created_at: datetime
 
 
@@ -39,3 +40,7 @@ class AdminUsersListResponse(SchemaBase):
 class AdminSellersListResponse(SchemaBase):
     items: list[AdminSellerItem]
     total: int
+
+
+class UpdateSellerStatusRequest(SchemaBase):
+    status: SellerStatus

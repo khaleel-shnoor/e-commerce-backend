@@ -19,7 +19,7 @@ from app.core.security import (
     verify_token_type,
 )
 from app.models.auth import EmailVerificationToken, PasswordResetToken, RefreshToken
-from app.models.enums import RoleName, TokenPurpose
+from app.models.enums import RoleName, SellerStatus, TokenPurpose
 from app.models.user import User
 from app.repositories.auth import (
     EmailVerificationTokenRepository,
@@ -39,7 +39,9 @@ from app.schemas.auth import (
 )
 from app.services.email import EmailService
 from app.utils.user_response import to_user_response
-
+from app.models.seller import Seller
+from app.repositories.seller import SellerRepository
+from app.utils.slug import slugify, unique_store_slug
 
 class AuthService:
     """Handles registration, login, tokens, and password flows."""
@@ -52,6 +54,7 @@ class AuthService:
         self.refresh_tokens = RefreshTokenRepository(session)
         self.reset_tokens = PasswordResetTokenRepository(session)
         self.verify_tokens = EmailVerificationTokenRepository(session)
+        self.sellers = SellerRepository(session)
         self.email = EmailService(settings)
 
     async def _ensure_roles_seeded(self) -> None:
@@ -97,14 +100,19 @@ class AuthService:
 
     async def register(self, data: RegisterRequest) -> AuthResponse:
         await self._ensure_roles_seeded()
+
         email = data.email.lower()
 
         if await self.users.get_by_email(email):
             raise ConflictError("Email already registered")
 
         role = await self.roles.get_by_name(data.role)
+
         if role is None:
             raise ValidationError(f"Role {data.role.value} not configured")
+
+        if data.role == RoleName.SELLER and (not data.store_name or not data.store_name.strip()):
+            raise ValidationError("Store name is required")
 
         user = User(
             email=email,
@@ -112,14 +120,41 @@ class AuthService:
             full_name=data.full_name,
             is_verified=False,
         )
+
         await self.users.add(user)
+
         await self.roles.assign_role(user, role)
+
+        if data.role == RoleName.SELLER:
+            base_slug = slugify(
+                (data.store_slug or data.store_name).strip(),
+            )
+            store_slug = await unique_store_slug(
+                self.session,
+                base_slug,
+                exists=self.sellers.slug_exists,
+            )
+            seller = Seller(
+                user_id=user.id,
+                store_name=data.store_name.strip(),
+                store_slug=store_slug,
+                description=data.description.strip() if data.description else None,
+                status=SellerStatus.PENDING,
+            )
+            await self.sellers.add(seller)
+
         user = await self.users.get_with_roles(user.id)
+
         assert user is not None
 
         await self._send_verification_email(user)
+
         tokens = await self._issue_tokens(user)
-        return AuthResponse(user=to_user_response(user), tokens=tokens)
+
+        return AuthResponse(
+            user=to_user_response(user),
+            tokens=tokens,
+        )
 
     async def login(self, data: LoginRequest, *, user_agent: str | None = None, ip: str | None = None) -> AuthResponse:
         user = await self.users.get_by_email(data.email.lower())

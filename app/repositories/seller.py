@@ -14,6 +14,29 @@ class SellerRepository(BaseRepository[Seller]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Seller)
 
+    async def get_by_user_id(self, user_id) -> Seller | None:
+        stmt = (
+            select(Seller)
+            .where(Seller.user_id == user_id)
+            .options(selectinload(Seller.user).selectinload(User.roles))
+        )
+        result = await self.session.scalars(stmt)
+        return result.first()
+
+    async def get_by_id_with_user(self, seller_id) -> Seller | None:
+        stmt = (
+            select(Seller)
+            .where(Seller.id == seller_id)
+            .options(selectinload(Seller.user).selectinload(User.roles))
+        )
+        result = await self.session.scalars(stmt)
+        return result.first()
+
+    async def slug_exists(self, slug: str) -> bool:
+        stmt = select(Seller.id).where(Seller.store_slug == slug).limit(1)
+        result = await self.session.scalars(stmt)
+        return result.first() is not None
+
     async def list_with_users(
         self,
         *,

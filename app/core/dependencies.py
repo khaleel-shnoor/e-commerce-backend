@@ -16,6 +16,7 @@ from app.models.enums import RoleName
 from app.models.user import User
 from app.services.auth import AuthService
 from app.services.email import EmailService
+from app.services.product import ProductService
 from app.services.profile import ProfileService
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -46,6 +47,10 @@ def get_auth_service(
 
 def get_profile_service(db: "DbSession", settings: "SettingsDep") -> ProfileService:
     return ProfileService(db, settings)
+
+
+def get_product_service(db: "DbSession", settings: "SettingsDep") -> ProductService:
+    return ProductService(db, settings)
 
 
 async def get_current_user(
@@ -91,5 +96,6 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 EmailServiceDep = Annotated[EmailService, Depends(get_email_service)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+ProductServiceDep = Annotated[ProductService, Depends(get_product_service)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_roles(RoleName.ADMIN))]

@@ -7,6 +7,7 @@ from app.models.seller import Seller
 from app.models.user import User
 from app.repositories.seller import SellerRepository
 from app.repositories.user import UserRepository
+from app.core.exceptions import NotFoundError
 from app.schemas.admin import AdminSellerItem, AdminUserItem
 
 
@@ -49,6 +50,19 @@ class AdminService:
         )
         return [_to_admin_seller(s) for s in rows], len(rows)
 
+    async def update_seller_status(
+        self,
+        seller_id,
+        *,
+        status: SellerStatus,
+    ) -> AdminSellerItem:
+        seller = await self.sellers.get_by_id_with_user(seller_id)
+        if seller is None:
+            raise NotFoundError("Seller not found")
+        seller.status = status
+        await self.session.flush()
+        return _to_admin_seller(seller)
+
 
 def _to_admin_user(user: User) -> AdminUserItem:
     return AdminUserItem(
@@ -75,5 +89,6 @@ def _to_admin_seller(seller: Seller) -> AdminSellerItem:
         store_slug=seller.store_slug,
         status=seller.status,
         user_is_active=user.is_active,
+        user_is_verified=user.is_verified,
         created_at=seller.created_at,
     )

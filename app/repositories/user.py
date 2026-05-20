@@ -19,13 +19,23 @@ class UserRepository(BaseRepository[User]):
         stmt = (
             select(User)
             .where(User.email == email.lower())
-            .options(selectinload(User.roles))
+            .options(
+                selectinload(User.roles),
+                selectinload(User.seller_profile),
+            )
         )
         result = await self.session.scalars(stmt)
         return result.first()
 
     async def get_with_roles(self, user_id: uuid.UUID) -> User | None:
-        stmt = select(User).where(User.id == user_id).options(selectinload(User.roles))
+        stmt = (
+            select(User)
+            .where(User.id == user_id)
+            .options(
+                selectinload(User.roles),
+                selectinload(User.seller_profile),
+            )
+        )
         result = await self.session.scalars(stmt)
         return result.first()
 

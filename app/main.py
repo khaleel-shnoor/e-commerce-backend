@@ -18,7 +18,7 @@ from app.core.database import DatabaseSessionManager
 from app.core.exceptions import AppError
 from app.core.logging import configure_logging
 from app.core.startup import log_startup_banner, validate_settings, verify_database_on_startup
-from app.db.seed import seed_roles
+from app.db.seed import seed_categories, seed_roles
 from app.services.oauth import configure_oauth
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             async with db_manager._session_factory() as session:  # noqa: SLF001
                 await seed_roles(session)
+                await seed_categories(session)
                 await session.commit()
             app.state.db_connected = True
         except Exception:

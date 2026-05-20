@@ -5,16 +5,26 @@ from uuid import UUID
 
 from pydantic import EmailStr, Field
 
-from app.models.enums import RoleName
+from app.models.enums import RoleName, SellerStatus
 from app.schemas.common import SchemaBase
 
+
+# class RegisterRequest(SchemaBase):
+#     email: EmailStr
+#     password: str = Field(min_length=8, max_length=128)
+#     full_name: str | None = Field(default=None, max_length=255)
+#     role: RoleName = RoleName.CUSTOMER
 
 class RegisterRequest(SchemaBase):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
+
     role: RoleName = RoleName.CUSTOMER
 
+    store_name: str | None = Field(default=None, max_length=255)
+    store_slug: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
 
 class LoginRequest(SchemaBase):
     email: EmailStr
@@ -32,6 +42,14 @@ class RefreshRequest(SchemaBase):
     refresh_token: str
 
 
+class SellerProfileResponse(SchemaBase):
+    id: UUID
+    store_name: str
+    store_slug: str
+    status: SellerStatus
+    description: str | None = None
+
+
 class UserResponse(SchemaBase):
     id: UUID
     email: str
@@ -41,6 +59,7 @@ class UserResponse(SchemaBase):
     is_active: bool
     is_verified: bool
     roles: list[str]
+    seller: SellerProfileResponse | None = None
     created_at: datetime
 
 

@@ -1,10 +1,17 @@
 """Admin API routes — users and sellers."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Query
 
 from app.core.dependencies import AdminUser, DbSession
 from app.models.enums import RoleName, SellerStatus
-from app.schemas.admin import AdminSellersListResponse, AdminUsersListResponse
+from app.schemas.admin import (
+    AdminSellerItem,
+    AdminSellersListResponse,
+    AdminUsersListResponse,
+    UpdateSellerStatusRequest,
+)
 from app.services.admin import AdminService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -48,3 +55,15 @@ async def list_sellers(
         offset=offset,
     )
     return AdminSellersListResponse(items=items, total=total)
+
+
+@router.patch("/sellers/{seller_id}/status", response_model=AdminSellerItem)
+async def update_seller_status(
+    seller_id: UUID,
+    body: UpdateSellerStatusRequest,
+    _admin: AdminUser,
+    db: DbSession,
+) -> AdminSellerItem:
+    """Approve, reject, or suspend a seller account (admin only)."""
+    service = AdminService(db)
+    return await service.update_seller_status(seller_id, status=body.status)

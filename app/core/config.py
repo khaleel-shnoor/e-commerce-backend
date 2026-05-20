@@ -159,6 +159,7 @@ class Settings(BaseSettings):
 
     def _resolved_database(self) -> tuple[str, dict[str, Any]]:
         if self.database_url:
+            print("POSTGRES_USER =", self.postgres_user)
             return normalize_async_database_url(self.database_url)
         composed = (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"

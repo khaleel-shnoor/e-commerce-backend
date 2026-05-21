@@ -6,9 +6,11 @@ from app.api.v1.routes import (
     admin,
     auth,
     categories,
+    customer,
     health,
     products,
     profile,
+    seller_orders,
     seller_products,
     status,
 )
@@ -23,3 +25,5 @@ api_router.include_router(admin.router)
 api_router.include_router(products.router)
 api_router.include_router(categories.router)
 api_router.include_router(seller_products.router)
+api_router.include_router(customer.router)
+api_router.include_router(seller_orders.router)

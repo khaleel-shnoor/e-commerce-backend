@@ -1,4 +1,4 @@
-"""Admin API routes — users and sellers."""
+"""Admin API routes — users, sellers, orders, and analytics."""
 
 from uuid import UUID
 
@@ -12,7 +12,9 @@ from app.schemas.admin import (
     AdminUsersListResponse,
     UpdateSellerStatusRequest,
 )
+from app.schemas.order import AdminAnalyticsResponse, OrderDetailResponse, OrderListResponse
 from app.services.admin import AdminService
+from app.services.order import OrderService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -67,3 +69,53 @@ async def update_seller_status(
     """Approve, reject, or suspend a seller account (admin only)."""
     service = AdminService(db)
     return await service.update_seller_status(seller_id, status=body.status)
+
+
+@router.get("/analytics", response_model=AdminAnalyticsResponse)
+async def get_admin_analytics(_admin: AdminUser, db: DbSession) -> AdminAnalyticsResponse:
+    """Platform-wide analytics (admin only)."""
+    svc = OrderService(db)
+    return await svc.get_admin_analytics()
+
+
+@router.get("/orders", response_model=OrderListResponse)
+async def list_all_orders(
+    _admin: AdminUser,
+    db: DbSession,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> OrderListResponse:
+    """List all platform orders (admin only)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.order import Order, OrderItem
+
+    stmt = (
+        select(Order)
+        .options(selectinload(Order.items))
+        .order_by(Order.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.scalars(stmt)
+    orders = list(result.unique().all())
+
+    from sqlalchemy import func
+    count_stmt = select(func.count()).select_from(Order)
+    total = int((await db.scalar(count_stmt)) or 0)
+
+    from app.schemas.order import OrderListItem
+    return OrderListResponse(
+        items=[
+            OrderListItem(
+                id=o.id,
+                order_number=o.order_number,
+                status=o.status,
+                total_amount=o.total_amount,
+                item_count=len(o.items),
+                created_at=o.created_at,
+            )
+            for o in orders
+        ],
+        total=total,
+    )

@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, computed_field, field_validator, model_validator
@@ -8,12 +9,15 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.core.db_url import normalize_async_database_url
 
+# Absolute path to backend/.env — works regardless of where the app is launched from.
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+
 
 class Settings(BaseSettings):
     """Central configuration for the SHNOOR API."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

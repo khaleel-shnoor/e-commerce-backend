@@ -22,6 +22,8 @@ from app.schemas.order import (
     AddressListResponse,
     AddressResponse,
     AdminAnalyticsResponse,
+    AdminOrderDetailResponse,
+    AdminOrderItemResponse,
     CartAddRequest,
     CartItemResponse,
     CartResponse,
@@ -347,15 +349,56 @@ class OrderService:
             select(Order)
             .where(Order.id == order_id, Order.user_id == user_id)
             .options(
-                selectinload(Order.items),
                 selectinload(Order.shipping_address),
+                selectinload(Order.items)
+                    .selectinload(OrderItem.product)
+                    .selectinload(Product.seller),
+                selectinload(Order.items)
+                    .selectinload(OrderItem.product)
+                    .selectinload(Product.images),
             )
         )
         result = await self.session.scalars(stmt)
         order = result.first()
         if order is None:
             raise NotFoundError("Order not found")
-        return self._order_detail(order)
+
+        addr = order.__dict__.get("shipping_address")
+        addr_resp = self._addr_resp(addr) if addr else None
+
+        items = []
+        for oi in order.items:
+            product = oi.__dict__.get("product")
+            seller = product.seller if product else None
+            items.append(OrderItemResponse(
+                id=oi.id,
+                product_id=oi.product_id,
+                product_name=oi.product_name,
+                quantity=oi.quantity,
+                unit_price=oi.unit_price,
+                line_total=oi.line_total,
+                seller_id=seller.id if seller else None,
+                seller_name=seller.store_name if seller else None,
+                seller_slug=seller.store_slug if seller else None,
+                product_image_url=_primary_image(product) if product else None,
+            ))
+
+        return OrderDetailResponse(
+            id=order.id,
+            order_number=order.order_number,
+            status=order.status,
+            subtotal=order.subtotal,
+            tax_amount=order.tax_amount,
+            shipping_amount=order.shipping_amount,
+            discount_amount=order.discount_amount,
+            total_amount=order.total_amount,
+            notes=order.notes,
+            items=items,
+            shipping_address=addr_resp,
+            payment_method="Cash on Delivery",
+            created_at=order.created_at,
+            updated_at=order.updated_at,
+        )
 
     async def checkout(self, user_id: uuid.UUID, req: CheckoutRequest) -> OrderDetailResponse:
         # Load active cart
@@ -668,3 +711,73 @@ class OrderService:
             revenue_by_month=revenue_by_month,
             recent_orders=recent_orders,
         )
+
+    async def get_admin_order_detail(self, order_id: uuid.UUID) -> AdminOrderDetailResponse:
+        stmt = (
+            select(Order)
+            .where(Order.id == order_id)
+            .options(
+                selectinload(Order.user),
+                selectinload(Order.shipping_address),
+                selectinload(Order.items)
+                    .selectinload(OrderItem.product)
+                    .selectinload(Product.seller)
+                    .selectinload(Seller.user),
+            )
+        )
+        order = (await self.session.scalars(stmt)).first()
+        if order is None:
+            raise NotFoundError("Order not found")
+
+        items = []
+        for item in order.items:
+            product = item.product
+            seller = product.seller if product else None
+            seller_user = seller.user if seller else None
+            items.append(AdminOrderItemResponse(
+                id=item.id,
+                product_id=item.product_id,
+                product_name=item.product_name,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                line_total=item.line_total,
+                seller_id=seller.id if seller else None,
+                seller_name=seller.store_name if seller else None,
+                seller_email=seller_user.email if seller_user else None,
+            ))
+
+        shipping_address = None
+        if order.shipping_address:
+            a = order.shipping_address
+            shipping_address = AddressResponse(
+                id=a.id, label=a.label, line1=a.line1, line2=a.line2,
+                city=a.city, state=a.state, postal_code=a.postal_code,
+                country=a.country, is_default=a.is_default, created_at=a.created_at,
+            )
+
+        return AdminOrderDetailResponse(
+            id=order.id,
+            order_number=order.order_number,
+            status=order.status,
+            subtotal=order.subtotal,
+            tax_amount=order.tax_amount,
+            shipping_amount=order.shipping_amount,
+            discount_amount=order.discount_amount,
+            total_amount=order.total_amount,
+            notes=order.notes,
+            items=items,
+            shipping_address=shipping_address,
+            payment_method="Cash on Delivery",
+            created_at=order.created_at,
+            updated_at=order.updated_at,
+            buyer_name=order.user.full_name if order.user else None,
+            buyer_email=order.user.email if order.user else "",
+        )
+
+    async def update_order_status(self, order_id: uuid.UUID, status: OrderStatus) -> AdminOrderDetailResponse:
+        order = await self.session.get(Order, order_id)
+        if order is None:
+            raise NotFoundError("Order not found")
+        order.status = status
+        await self.session.flush()
+        return await self.get_admin_order_detail(order_id)

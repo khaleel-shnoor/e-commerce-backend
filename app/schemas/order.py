@@ -119,6 +119,10 @@ class OrderItemResponse(SchemaBase):
     quantity: int
     unit_price: Decimal
     line_total: Decimal
+    seller_id: UUID | None = None
+    seller_name: str | None = None
+    seller_slug: str | None = None
+    product_image_url: str | None = None
 
 
 class OrderListItem(SchemaBase):
@@ -150,6 +154,59 @@ class OrderDetailResponse(SchemaBase):
 class OrderListResponse(SchemaBase):
     items: list[OrderListItem]
     total: int
+
+
+# ── Admin order views ─────────────────────────────────────────────────────────
+
+class AdminOrderItemResponse(SchemaBase):
+    id: UUID
+    product_id: UUID
+    product_name: str
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    seller_id: UUID | None
+    seller_name: str | None
+    seller_email: str | None
+
+
+class AdminOrderListItem(SchemaBase):
+    id: UUID
+    order_number: str
+    status: OrderStatus
+    total_amount: Decimal
+    item_count: int
+    created_at: datetime
+    buyer_name: str | None
+    buyer_email: str
+
+
+class AdminOrderListResponse(SchemaBase):
+    items: list[AdminOrderListItem]
+    total: int
+
+
+class AdminOrderDetailResponse(SchemaBase):
+    id: UUID
+    order_number: str
+    status: OrderStatus
+    subtotal: Decimal
+    tax_amount: Decimal
+    shipping_amount: Decimal
+    discount_amount: Decimal
+    total_amount: Decimal
+    notes: str | None
+    items: list[AdminOrderItemResponse]
+    shipping_address: AddressResponse | None
+    payment_method: str
+    created_at: datetime
+    updated_at: datetime
+    buyer_name: str | None
+    buyer_email: str
+
+
+class UpdateOrderStatusRequest(SchemaBase):
+    status: OrderStatus
 
 
 class CheckoutRequest(SchemaBase):

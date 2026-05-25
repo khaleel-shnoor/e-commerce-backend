@@ -12,7 +12,15 @@ from app.schemas.admin import (
     AdminUsersListResponse,
     UpdateSellerStatusRequest,
 )
-from app.schemas.order import AdminAnalyticsResponse, OrderDetailResponse, OrderListResponse
+from app.schemas.order import (
+    AdminAnalyticsResponse,
+    AdminOrderDetailResponse,
+    AdminOrderListItem,
+    AdminOrderListResponse,
+    OrderDetailResponse,
+    OrderListResponse,
+    UpdateOrderStatusRequest,
+)
 from app.services.admin import AdminService
 from app.services.order import OrderService
 
@@ -78,21 +86,21 @@ async def get_admin_analytics(_admin: AdminUser, db: DbSession) -> AdminAnalytic
     return await svc.get_admin_analytics()
 
 
-@router.get("/orders", response_model=OrderListResponse)
+@router.get("/orders", response_model=AdminOrderListResponse)
 async def list_all_orders(
     _admin: AdminUser,
     db: DbSession,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-) -> OrderListResponse:
+) -> AdminOrderListResponse:
     """List all platform orders (admin only)."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
     from sqlalchemy.orm import selectinload
     from app.models.order import Order, OrderItem
 
     stmt = (
         select(Order)
-        .options(selectinload(Order.items))
+        .options(selectinload(Order.items), selectinload(Order.user))
         .order_by(Order.created_at.desc())
         .limit(limit)
         .offset(offset)
@@ -100,22 +108,45 @@ async def list_all_orders(
     result = await db.scalars(stmt)
     orders = list(result.unique().all())
 
-    from sqlalchemy import func
     count_stmt = select(func.count()).select_from(Order)
     total = int((await db.scalar(count_stmt)) or 0)
 
-    from app.schemas.order import OrderListItem
-    return OrderListResponse(
+    return AdminOrderListResponse(
         items=[
-            OrderListItem(
+            AdminOrderListItem(
                 id=o.id,
                 order_number=o.order_number,
                 status=o.status,
                 total_amount=o.total_amount,
                 item_count=len(o.items),
                 created_at=o.created_at,
+                buyer_name=o.user.full_name if o.user else None,
+                buyer_email=o.user.email if o.user else "",
             )
             for o in orders
         ],
         total=total,
     )
+
+
+@router.get("/orders/{order_id}", response_model=AdminOrderDetailResponse)
+async def get_order_detail(
+    order_id: UUID,
+    _admin: AdminUser,
+    db: DbSession,
+) -> AdminOrderDetailResponse:
+    """Get full order detail including buyer and seller info (admin only)."""
+    svc = OrderService(db)
+    return await svc.get_admin_order_detail(order_id)
+
+
+@router.patch("/orders/{order_id}/status", response_model=AdminOrderDetailResponse)
+async def update_order_status(
+    order_id: UUID,
+    body: UpdateOrderStatusRequest,
+    _admin: AdminUser,
+    db: DbSession,
+) -> AdminOrderDetailResponse:
+    """Update the status of an order (admin only)."""
+    svc = OrderService(db)
+    return await svc.update_order_status(order_id, body.status)

@@ -5,11 +5,15 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.dependencies import AdminUser, DbSession
-from app.models.enums import RoleName, SellerStatus
+from app.models.enums import ProductStatus, RoleName, SellerStatus
 from app.schemas.admin import (
+    AdminProductDetailResponse,
+    AdminProductItem,
+    AdminProductsListResponse,
     AdminSellerItem,
     AdminSellersListResponse,
     AdminUsersListResponse,
+    UpdateProductStatusRequest,
     UpdateSellerStatusRequest,
 )
 from app.schemas.order import (
@@ -150,3 +154,46 @@ async def update_order_status(
     """Update the status of an order (admin only)."""
     svc = OrderService(db)
     return await svc.update_order_status(order_id, body.status)
+
+
+@router.get("/products", response_model=AdminProductsListResponse)
+async def list_products(
+    _admin: AdminUser,
+    db: DbSession,
+    status: ProductStatus | None = None,
+    search: str | None = Query(default=None, max_length=255),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> AdminProductsListResponse:
+    """List all products with optional status filter (admin only)."""
+    service = AdminService(db)
+    items, total = await service.list_products(
+        status=status,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+    return AdminProductsListResponse(items=items, total=total)
+
+
+@router.get("/products/{product_id}", response_model=AdminProductDetailResponse)
+async def get_product_detail(
+    product_id: UUID,
+    _admin: AdminUser,
+    db: DbSession,
+) -> AdminProductDetailResponse:
+    """Get full product detail including seller info and seller's other products (admin only)."""
+    service = AdminService(db)
+    return await service.get_product_detail(product_id)
+
+
+@router.patch("/products/{product_id}/status", response_model=AdminProductItem)
+async def update_product_status(
+    product_id: UUID,
+    body: UpdateProductStatusRequest,
+    _admin: AdminUser,
+    db: DbSession,
+) -> AdminProductItem:
+    """Approve, reject, or change a product's status (admin only)."""
+    service = AdminService(db)
+    return await service.update_product_status(product_id, status=body.status)

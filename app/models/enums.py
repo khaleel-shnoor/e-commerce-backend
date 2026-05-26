@@ -18,6 +18,7 @@ class SellerStatus(str, enum.Enum):
 
 class ProductStatus(str, enum.Enum):
     DRAFT = "draft"
+    PENDING = "pending"
     ACTIVE = "active"
     INACTIVE = "inactive"
     ARCHIVED = "archived"

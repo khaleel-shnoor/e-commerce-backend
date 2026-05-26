@@ -284,6 +284,11 @@ class ProductService:
             exists=lambda s: self.products.slug_exists_for_seller(seller.id, s),
         )
 
+        # Sellers may only save as DRAFT or submit for review (PENDING).
+        # Any other value (e.g. ACTIVE) is ignored and defaults to PENDING.
+        allowed_create_statuses = (ProductStatus.DRAFT, ProductStatus.PENDING)
+        resolved_status = data.status if data.status in allowed_create_statuses else ProductStatus.PENDING
+
         product = Product(
             seller_id=seller.id,
             category_id=data.category_id,
@@ -294,7 +299,7 @@ class ProductService:
             sku=data.sku,
             price=data.price,
             compare_at_price=data.compare_at_price,
-            status=data.status,
+            status=resolved_status,
         )
         await self.products.add(product)
 
@@ -344,6 +349,14 @@ class ProductService:
         image_url = updates.pop("image_url", None)
         image_alt = updates.pop("image_alt", None)
         quantity_available = updates.pop("quantity_available", None)
+
+        # Sellers may not self-approve; only admin can set ACTIVE or ARCHIVED.
+        seller_allowed_statuses = (ProductStatus.DRAFT, ProductStatus.PENDING, ProductStatus.INACTIVE)
+        if "status" in updates and updates["status"] not in seller_allowed_statuses:
+            raise ValidationError(
+                "Products must be reviewed before going live. "
+                "You can set status to draft, pending, or inactive."
+            )
 
         for field, value in updates.items():
             setattr(product, field, value)

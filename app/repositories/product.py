@@ -12,6 +12,7 @@ from app.models.commerce_ext import Brand
 from app.models.enums import ProductStatus, SellerStatus
 from app.models.inventory import Inventory
 from app.models.seller import Seller
+from app.models.user import User
 from app.repositories.base import BaseRepository
 
 
@@ -27,6 +28,25 @@ class ProductRepository(BaseRepository[Product]):
             selectinload(Product.seller),
             selectinload(Product.inventory),
         )
+
+    def _admin_detail_options(self):
+        """Like _detail_options but also loads Seller.user for admin views."""
+        return (
+            selectinload(Product.images),
+            selectinload(Product.category),
+            selectinload(Product.brand),
+            selectinload(Product.seller).selectinload(Seller.user),
+            selectinload(Product.inventory),
+        )
+
+    async def get_for_admin(self, product_id: uuid.UUID) -> Product | None:
+        stmt = (
+            select(Product)
+            .where(Product.id == product_id)
+            .options(*self._admin_detail_options())
+        )
+        result = await self.session.scalars(stmt)
+        return result.first()
 
     async def get_by_id(self, product_id: uuid.UUID) -> Product | None:
         stmt = (
@@ -208,6 +228,58 @@ class ProductRepository(BaseRepository[Product]):
             stmt = stmt.where(Product.price >= min_price)
         if max_price is not None:
             stmt = stmt.where(Product.price <= max_price)
+        result = await self.session.scalar(stmt)
+        return int(result or 0)
+
+    async def list_for_admin(
+        self,
+        *,
+        status: ProductStatus | None = None,
+        search: str | None = None,
+        seller_id: uuid.UUID | None = None,
+        exclude_id: uuid.UUID | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Product]:
+        stmt = (
+            select(Product)
+            .join(Seller, Product.seller_id == Seller.id)
+            .options(*self._detail_options())
+            .order_by(Product.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        if status is not None:
+            stmt = stmt.where(Product.status == status)
+        if seller_id is not None:
+            stmt = stmt.where(Product.seller_id == seller_id)
+        if exclude_id is not None:
+            stmt = stmt.where(Product.id != exclude_id)
+        if search:
+            term = f"%{search.strip()}%"
+            stmt = stmt.where(or_(Product.name.ilike(term), Product.sku.ilike(term)))
+        result = await self.session.scalars(stmt)
+        return list(result.unique().all())
+
+    async def count_for_admin(
+        self,
+        *,
+        status: ProductStatus | None = None,
+        search: str | None = None,
+        seller_id: uuid.UUID | None = None,
+    ) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Product)
+            .join(Seller, Product.seller_id == Seller.id)
+        )
+        if status is not None:
+            stmt = stmt.where(Product.status == status)
+        if seller_id is not None:
+            stmt = stmt.where(Product.seller_id == seller_id)
+        if search:
+            term = f"%{search.strip()}%"
+            stmt = stmt.where(or_(Product.name.ilike(term), Product.sku.ilike(term)))
         result = await self.session.scalar(stmt)
         return int(result or 0)
 

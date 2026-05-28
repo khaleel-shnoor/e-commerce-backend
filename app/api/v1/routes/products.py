@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.core.dependencies import ProductServiceDep
+from app.core.dependencies import CurrentUser, ProductServiceDep
 from app.schemas.product import ProductDetailResponse, ProductListResponse
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -36,7 +36,27 @@ async def list_products(
     )
 
 
+@router.get("/recommendations", response_model=ProductListResponse)
+async def get_recommendations(
+    service: ProductServiceDep,
+    user: CurrentUser,
+    limit: int = Query(default=8, ge=1, le=20),
+) -> ProductListResponse:
+    """Personalised product recommendations for the authenticated customer."""
+    return await service.get_recommendations(user.id, limit=limit)
+
+
 @router.get("/{identifier}", response_model=ProductDetailResponse)
 async def get_product(identifier: str, service: ProductServiceDep) -> ProductDetailResponse:
     """Product detail by UUID or slug (active listings only)."""
     return await service.get_public(identifier)
+
+
+@router.get("/{identifier}/related", response_model=ProductListResponse)
+async def get_related_products(
+    identifier: str,
+    service: ProductServiceDep,
+    limit: int = Query(default=4, ge=1, le=12),
+) -> ProductListResponse:
+    """Products from the same category as the given product (active listings only)."""
+    return await service.get_related(identifier, limit=limit)

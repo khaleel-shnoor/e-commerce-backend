@@ -233,6 +233,23 @@ class ProductService:
             raise NotFoundError("Product not found")
         return self._to_detail(product)
 
+    async def get_related(self, identifier: str, limit: int = 4) -> ProductListResponse:
+        """Products from the same category as the given product, excluding itself."""
+        product = None
+        try:
+            product = await self.products.get_public_by_id(uuid.UUID(identifier))
+        except ValueError:
+            product = await self.products.get_public_by_slug(identifier)
+        if product is None:
+            return ProductListResponse(items=[], total=0)
+        rows = await self.products.list_related(product.category_id, product.id, limit)
+        return ProductListResponse(items=[self._to_list_item(p) for p in rows], total=len(rows))
+
+    async def get_recommendations(self, user_id: uuid.UUID, limit: int = 8) -> ProductListResponse:
+        """Personalised product recommendations based on the user's order and wishlist history."""
+        rows = await self.products.list_recommended(user_id, limit)
+        return ProductListResponse(items=[self._to_list_item(p) for p in rows], total=len(rows))
+
     async def list_for_seller(
         self,
         user_id: uuid.UUID,

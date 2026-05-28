@@ -7,10 +7,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.cart import Wishlist, WishlistItem
 from app.models.catalog import Product, ProductImage
 from app.models.commerce_ext import Brand
 from app.models.enums import ProductStatus, SellerStatus
 from app.models.inventory import Inventory
+from app.models.order import Order, OrderItem
 from app.models.seller import Seller
 from app.models.user import User
 from app.repositories.base import BaseRepository
@@ -282,6 +284,93 @@ class ProductRepository(BaseRepository[Product]):
             stmt = stmt.where(or_(Product.name.ilike(term), Product.sku.ilike(term)))
         result = await self.session.scalar(stmt)
         return int(result or 0)
+
+    async def list_related(
+        self,
+        category_id: uuid.UUID | None,
+        exclude_id: uuid.UUID,
+        limit: int = 4,
+    ) -> list[Product]:
+        """Same-category products, excluding the current one. Falls back to newest if no category."""
+        stmt = (
+            select(Product)
+            .join(Seller, Product.seller_id == Seller.id)
+            .where(
+                Product.status == ProductStatus.ACTIVE,
+                Seller.status == SellerStatus.APPROVED,
+                Product.id != exclude_id,
+            )
+            .options(*self._detail_options())
+            .order_by(Product.created_at.desc())
+            .limit(limit)
+        )
+        if category_id is not None:
+            stmt = stmt.where(Product.category_id == category_id)
+        result = await self.session.scalars(stmt)
+        return list(result.unique().all())
+
+    async def list_recommended(
+        self,
+        user_id: uuid.UUID,
+        limit: int = 8,
+    ) -> list[Product]:
+        """Products recommended for a user based on order + wishlist category history.
+
+        Falls back to newest active products when the user has no history yet.
+        """
+        # Collect category_ids from order history
+        order_cat_stmt = (
+            select(Product.category_id)
+            .join(OrderItem, OrderItem.product_id == Product.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.user_id == user_id, Product.category_id.is_not(None))
+            .distinct()
+        )
+        # Collect category_ids from wishlist
+        wishlist_cat_stmt = (
+            select(Product.category_id)
+            .join(WishlistItem, WishlistItem.product_id == Product.id)
+            .join(Wishlist, Wishlist.id == WishlistItem.wishlist_id)
+            .where(Wishlist.user_id == user_id, Product.category_id.is_not(None))
+            .distinct()
+        )
+        # Already-ordered product ids to exclude
+        ordered_ids_stmt = (
+            select(OrderItem.product_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.user_id == user_id)
+        )
+
+        category_ids = list((await self.session.scalars(order_cat_stmt)).all())
+        category_ids += [
+            cid
+            for cid in (await self.session.scalars(wishlist_cat_stmt)).all()
+            if cid not in category_ids
+        ]
+        ordered_product_ids = list((await self.session.scalars(ordered_ids_stmt)).all())
+
+        stmt = (
+            select(Product)
+            .join(Seller, Product.seller_id == Seller.id)
+            .where(
+                Product.status == ProductStatus.ACTIVE,
+                Seller.status == SellerStatus.APPROVED,
+            )
+            .options(*self._detail_options())
+            .limit(limit)
+        )
+
+        if category_ids:
+            stmt = stmt.where(Product.category_id.in_(category_ids))
+            stmt = stmt.order_by(func.random())
+        else:
+            stmt = stmt.order_by(Product.created_at.desc())
+
+        if ordered_product_ids:
+            stmt = stmt.where(Product.id.notin_(ordered_product_ids))
+
+        result = await self.session.scalars(stmt)
+        return list(result.unique().all())
 
     async def add_image(self, image: ProductImage) -> ProductImage:
         self.session.add(image)
